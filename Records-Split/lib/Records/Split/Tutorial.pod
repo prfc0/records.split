@@ -1,0 +1,244 @@
+=head1 NAME
+
+Records::Split::Tutorial - Examples on how to use Regress::Split
+
+=head1 VERSION
+
+0.01
+
+=head1 DESCRIPTION
+
+This tutorial explains through a number of examples the various usage of Regress::Split module.
+I have tried to cover most of the scenarios.
+The basic idea of Regress::Split module is to take a list of records, and then group them into smaller groups 
+based on the arguments provided.
+It then splits those groups into each set based on how you want to split them.
+
+=head1 EXAMPLE 1
+
+This is a simple example which splits a list of records into sets in which the maximum number of records in a set can be 100.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    split_into_records => 100,
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 2
+
+This is another simple example which splits a list of records into 20 files.
+The number of records in each set would be (number of records)/20.
+Note that the records input is from a file rather than directly providing the list of records.
+
+    my $split = Records::Split->new(
+                                    file => $file,
+                                    split_into_files => 20
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 3
+
+This is an example using the groups. Each different group is defined its own set of records and how to split them.
+Here you would have exaplicitly defined the records for each group.
+
+    my $split = Records::Split->new(
+                                    groups => 
+                                    [
+                                        {
+                                            records => [ @records1 ],
+                                            split_into_files => 20,
+                                        },
+                                        {
+                                            file => $file,
+                                            split_into_records => 100,
+                                        },
+                                        {
+                                            records => [ @records2 ],
+                                            split_into_records => 20,
+                                        },
+                                    ], 
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 4
+
+In the above example, you explicitly defined the records for each group.
+This is static grouping.
+In this example, we will explore the dynamic grouping.
+Here the records for each group would be defined from the parent group's records.
+This is done using the B<group_by_pattern> tag. 
+Any records matching the pattern B<unit_DVE/> or B<unit_VCSDVE/>, would fall under the first group.
+Any records matching the pattern B<OSCI> would fall under the second group.
+The rest of records would fall under the parent's group.
+So the first group's records would be split into records of 5 each.
+Second group's records would be split into records of 30 each.
+And the rest would be split into records of 100 each.
+
+     my $split = Records::Split->new(
+                                     records => [ @records ],
+                                     split_into_records => 100,
+                                     groups =>
+                                     [
+                                        {
+                                            group_by_pattern => [ 'unit_DVE/', 'unit_VCSDVE/' ],
+                                            split_into_records => 5,
+                                        },
+                                        {
+                                            group_by_pattern => [ 'OSCI' ],
+                                            split_into_records => 30,
+                                        }, 
+                                     ],
+                                    );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 5
+
+This is similar to above. 
+The only difference is that in the first group, the records have already been defined.
+So the first group does uses any of the records from the parent's group to split the records.
+The second group uses the @patterns to construct its records from the parent's.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    split_into_records => 100,
+                                    groups =>
+                                    [
+                                        {
+                                            records => [ @records1 ],
+                                            split_into_files => 2,
+                                        },
+                                        {
+                                            group_by_pattern => [ @patterns ],
+                                            split_into_records => 25,
+                                        },
+                                    ], 
+                                   ); 
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 6
+
+This is am example showing the use of split_by_pattern.
+It takes a regular expression as argument and uses the $1 to construct the sub-groups.
+split_by_pattern creates sub-groups out of the group's records.
+So the sub-groups created by the split_by_pattern can be further split into files, records, etc.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    split_by_pattern => 'unit_[^/]+',
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 7
+
+This is an extension of the above example in which the each sub-group created by split_by_pattern is further split into sets of 20 records each.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    split_by_pattern => 'unit_[^/]+',
+                                    split_into_records => 20,
+                                   ); 
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 8
+
+This is another example using all the features explained above.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    groups => 
+                                    [
+                                        {
+                                            group_by_pattern => [ '\.csh$' ],
+                                            split_by_pattern => 'unit_.*/',
+                                            split_into_files => 2,
+                                        },
+                                        {
+                                            group_by_pattern => [ '\.v$' ],
+                                            split_by_pattern => 'unit_[^/]+',
+                                            split_into_records => 30,
+                                        }, 
+                                        {
+                                            group_by_pattern => [ '\.f$' ],
+                                            split_into_records => 50,
+                                        },
+                                    ],
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 9
+
+The following examples explain the split_by_weight feature.
+wrecords tag is a reference to a hash which contains the weight for each record given in the @records.
+For records which are undefined or does not exists in the %wrecords then the value assumed is 0.
+It splits the records into sets in which the total weight of each set is not more than the value given by split_by_weight.
+
+    my $split = Records::Split->new(
+                                    wrecords => { %wrecords },
+                                    records => [ @records ],
+                                    split_by_weight => 100,
+                                   );
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 10
+
+This example explains the use of split_by_weight in groups.
+It takes the weight of each record from the parent group's wrecords
+
+    my $split = Records::Split->new(
+                                    wrecords => { %wrecords },
+                                    groups => 
+                                    [
+                                        {
+                                            records => [ @records1 ],
+                                            split_by_weight => 200,
+                                        },
+                                        {   records => [ @records2 ],
+                                            split_by_weight => 100,
+                                        }, 
+                                        {
+                                            file => $file,
+                                            split_into_files => 10,
+                                        },
+                                    ],
+                                   ); 
+
+    my %sets = $split->split;
+
+=head1 EXAMPLE 11
+
+This example shows that wrecords use in a group.
+For records which do not exists in the group's wrecords, it looks in parent group's wrecords.
+
+    my $split = Records::Split->new(
+                                    records => [ @records ],
+                                    wrecords => { %wrecords },
+                                    split_into_files => 2,
+                                    groups => 
+                                    [
+                                        {
+                                            group_by_pattern => [ '\.csh$' ],
+                                            wrecords => { %wrecords1 },
+                                            split_by_weight => 300,
+                                        },
+                                        {
+                                            group_by_pattern => [ '\.v$', '\.f$', '\.vcdiff$' ],
+                                            split_by_weight => 200,
+                                        },
+                                    ],
+                                  ); 
+
+    my %sets = $split->split;
+
+=head1 AUTHOR
+
+Ankur Gupta <ankur2012@inbox.com>
+
